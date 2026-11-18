@@ -385,6 +385,9 @@ class InvoiceEndpoints:
         parts = parsed.path.strip("/").split("/")
         if parsed.path == "/api/services":
             return self.send(201, self.app.services.create(json.loads(self.body())))
+        if len(parts) == 4 and parts[:2] == ["api", "services"] and parts[3] == "save":
+            row = self.app.services.update(unquote(parts[2]), json.loads(self.body()))
+            return self.send(200, row)
         if parsed.path == "/api/uploads":
             data = self.body(MAX_UPLOAD)
             filename = Path(

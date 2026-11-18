@@ -24,6 +24,28 @@ const state = {
   reviewed: false,
   poll: null,
 };
+
+// Eski Excel adları aynı grupta gösterilir; kaynak verisi değiştirilmez.
+const SERVICE_TYPES = ['Düzenli (aylık)', 'Tek seferlik', 'Düzensiz', 'Bitti'];
+
+function serviceTypeLabel(value) {
+  return {
+    'Aylık': 'Düzenli (aylık)',
+    'Bir Kere': 'Tek seferlik',
+    'Aylık (Düzensiz)': 'Düzensiz',
+  }[value] || value || '';
+}
+
+function serviceTypeField(value = '') {
+  return /* HTML */ `<label class="field">
+    <span>Hizmet türü</span>
+    <input name="service_type" maxlength="100" list="service-types"
+      placeholder="Bir tür seçin veya kendiniz yazın" value="${esc(serviceTypeLabel(value))}" />
+    <datalist id="service-types">
+      ${SERVICE_TYPES.map((type) => `<option value="${esc(type)}"></option>`).join('')}
+    </datalist>
+  </label>`;
+}
 // Arayüzde kullanılan SVG simgeleri.
 const paths = {
   dashboard:
@@ -1200,9 +1222,12 @@ async function renderIncreaseAnalysis() {
   }
   if (state.route !== 'invoices' || state.invoiceView !== 'analysis') return;
   const data = state.increaseData;
-  const types = [...new Set(data.rows.map((row) => row.service_type).filter(Boolean))].sort(
-    (a, b) => a.localeCompare(b, 'tr'),
-  );
+  const types = [
+    ...new Set([
+      ...SERVICE_TYPES,
+      ...data.rows.map((row) => serviceTypeLabel(row.service_type)).filter(Boolean),
+    ]),
+  ].sort((a, b) => a.localeCompare(b, 'tr'));
   app.innerHTML = /* HTML */ `<div class="page">
     ${heading(
       'HİZMET BEDELLERİNİZ',
@@ -1296,9 +1321,9 @@ function updateIncreaseResults() {
   const { query, type } = state.increaseFilter;
   const selected = rows.filter(
     (row) =>
-      (type === 'all' || row.service_type === type) &&
+      (type === 'all' || serviceTypeLabel(row.service_type) === type) &&
       (!query ||
-        [row.institution, row.description, row.note, row.service_type]
+        [row.institution, row.description, row.note, row.service_type, serviceTypeLabel(row.service_type)]
           .filter(Boolean)
           .join(' ')
           .toLocaleLowerCase('tr')
@@ -1365,7 +1390,7 @@ function updateIncreaseResults() {
         ${selected
           .map(
             (row) =>
-              `<tr data-increase-id="${esc(row.id)}"><td class="increase-institution">${esc(row.institution || '—')}</td><th scope="row" class="increase-description"><a class="service-link" href="#service/${encodeURIComponent(row.id)}">${esc(row.description)}</a></th>${years.map((year) => `<td class="increase-value">${value(row.amounts[year])}</td>`).join('')}${years.map((year) => `<td class="increase-value">${rate(row.rates[year])}</td>`).join('')}<td class="increase-value increase-total">${rate(row.total_increase)}</td><td class="increase-value">${value(row.invoice_count)}</td><td class="increase-value">${value(row.unit_price)}</td><td><span class="service-type ${row.service_type === 'Bitti' ? 'ended' : ''}">${esc(row.service_type || '—')}</span></td><td class="increase-date">${date(row.single_date)}</td><td class="increase-note">${esc(row.note || '—')}</td></tr>`,
+              `<tr data-increase-id="${esc(row.id)}"><td class="increase-institution">${esc(row.institution || '—')}</td><th scope="row" class="increase-description"><a class="service-link" href="#service/${encodeURIComponent(row.id)}">${esc(row.description)}</a></th>${years.map((year) => `<td class="increase-value">${value(row.amounts[year])}</td>`).join('')}${years.map((year) => `<td class="increase-value">${rate(row.rates[year])}</td>`).join('')}<td class="increase-value increase-total">${rate(row.total_increase)}</td><td class="increase-value">${value(row.invoice_count)}</td><td class="increase-value">${value(row.unit_price)}</td><td><span class="service-type ${row.service_type === 'Bitti' ? 'ended' : ''}">${esc(serviceTypeLabel(row.service_type) || '—')}</span></td><td class="increase-date">${date(row.single_date)}</td><td class="increase-note">${esc(row.note || '—')}</td></tr>`,
           )
           .join('')}
       </tbody>
@@ -2100,6 +2125,7 @@ function showNewService() {
             '',
         )}"
     /></label>
+    ${serviceTypeField()}
     <p>
       Para birimi: ${esc(state.form.currency || 'TRY')}. Sonraki faturalar aynı açıklamadan
       eşleştirilir.
@@ -2192,13 +2218,12 @@ function servicePriceChart(service) {
 function renderServiceAnalysis(service) {
   const history = service.history || [];
   const last = service.series.at(-1);
-  const status = service.lifecycle === 'ended' ? 'Bitti' : 'Belirtilmedi';
-  app.innerHTML = /* HTML */ `<div class="page">
+  app.innerHTML = /* HTML */ `<div class="page service-page">
     ${heading(
       esc(service.institution),
       esc(service.description),
       'Hizmetin ödeme sayısı, dönem bilgileri ve fiyat geçmişi.',
-      `<a href="#invoices" class="btn btn-light">${icon('left')} Hizmetlere dön</a>`,
+      `<div class="approval-actions"><button type="button" class="btn btn-primary" id="edit-service">${icon('save')} Hizmeti düzenle</button><a href="#invoices" class="btn btn-light">${icon('left')} Hizmetlere dön</a></div>`,
     )}
     <div class="service-metrics">
       <section class="card">
@@ -2211,20 +2236,24 @@ function renderServiceAnalysis(service) {
         <p>${last ? last.year : 'Onaylanmış bedel bekleniyor'}</p>
       </section>
       <section class="card">
-        <small>Hizmet başlangıcı</small><strong>${servicePeriod(service.start_period)}</strong>
+        <small>Hizmet başlangıcı</small>
+        <strong>${service.start_date ? esc(shortDate(service.start_date)) : servicePeriod(service.start_period)}</strong>
         <p>
-          ${service.start_period ? 'Kaynak: Excel hizmet notu' : 'Başlangıç bilgisi kaynakta yok'}
+          ${service.start_date
+            ? 'Kaynak: Elle girilen başlangıç tarihi'
+            : service.start_period ? 'Kaynak: Excel hizmet notu' : 'Başlangıç tarihi belirtilmedi'}
         </p>
       </section>
       <section class="card">
-        <small>Devam durumu</small><strong>${status}</strong>
+        <small>Hizmet türü</small><strong>${esc(serviceTypeLabel(service.service_type) || 'Belirtilmedi')}</strong>
         <p>
-          ${service.end_period
-            ? `Bitiş: ${servicePeriod(service.end_period)}`
-            : esc(service.service_type || 'Hizmet dönemi belirtilmedi')}
+          ${service.lifecycle === 'ended'
+            ? `Bitiş: ${service.end_date ? esc(shortDate(service.end_date)) : servicePeriod(service.end_period)}`
+            : 'Hizmeti düzenle seçeneğinden değiştirebilirsiniz.'}
         </p>
       </section>
     </div>
+    ${renderAnnualPayments(service)}
     <section class="card form-card">
       <h2>Fiyat artış grafiği</h2>
       <p class="service-hint">
@@ -2244,7 +2273,9 @@ function renderServiceAnalysis(service) {
       ${service.lifecycle === 'ended' &&
       history.some(
         (h) =>
-          h.invoice_date && service.end_period && h.invoice_date.slice(0, 7) > service.end_period,
+          h.invoice_date && (service.end_date
+            ? h.invoice_date > service.end_date
+            : service.end_period && h.invoice_date.slice(0, 7) > service.end_period),
       )
         ? '<p class="field-warning">Kaynak bitiş döneminden sonra fatura var. Hizmetin devam durumunu teyit edin.</p>'
         : ''}
@@ -2256,11 +2287,338 @@ function renderServiceAnalysis(service) {
         faturaların tek tek tarih ve ödeme ayrıntıları yeni Excel ile tamamlanacak.
       </p>
       ${history.length
-        ? `<div class="table-wrap"><table class="invoice-table service-history"><thead><tr><th>Fatura no</th><th>Fatura tarihi</th><th>Genel tutar</th><th>Ödeme</th><th>Kontrol</th></tr></thead><tbody>${history.map((h) => `<tr><td><a class="service-link" href="#document/${encodeURIComponent(h.id)}">${esc(h.invoice_number || 'Numara okunmadı')}</a>${h.in_reference ? '<small> · Excel toplamına dahil</small>' : ''}</td><td>${esc(h.invoice_date || '—')}</td><td>${esc(money(h.gross, h.currency))}</td><td>Ödendi</td><td>${h.status === 'approved' ? 'Onaylandı' : 'Kontrol bekliyor'}</td></tr>`).join('')}</tbody></table></div>`
+        ? renderServiceInvoices(history)
         : '<p>Bu hizmete bağlı yeni fatura henüz yok.</p>'}
     </section>
     ${footer()}
   </div>`;
+  $('#edit-service').onclick = () => showServiceEditor(service);
+}
+
+// Yıllık toplam harcama, grafikteki yılın son hizmet bedelinden ayrı tutulur.
+function annualPaymentsChart(service) {
+  const rows = [...(service.annual_payments || [])].sort((a, b) => a.year - b.year);
+  if (!rows.length) return '';
+  // Number yalnızca sütun boyunu belirler; gösterilen tutar sunucudaki toplamdır.
+  const values = rows.map((row) => Number(row.total));
+  const maximum = Math.max(0, ...values);
+  const minimum = Math.min(0, ...values);
+  const range = maximum - minimum || 1;
+  const baseline = (-minimum / range) * 180;
+  return /* HTML */ `<figure class="annual-payments-chart">
+    <figcaption>Yıllara göre toplam ödeme · ${esc(service.currency)}</figcaption>
+    <div class="annual-payments-scroll" tabindex="0" aria-label="Yıllık ödeme grafiği; tüm yılları görmek için yatay kaydırabilirsiniz">
+      <ul class="annual-payments-columns">
+        ${rows.map((row, index) => {
+          const value = values[index];
+          const height = Math.abs(value) / range * 180;
+          const position = value < 0 ? `top:${180 - baseline}px` : `bottom:${baseline}px`;
+          const label = `${row.year}: ${money(row.total, service.currency)}, ${row.invoice_count} fatura${row.pending_count ? `; ${row.pending_count} faturanın tutarı kontrol bekliyor` : ''}`;
+          return /* HTML */ `<li class="annual-payments-column" title="${esc(label)}">
+            <strong>${esc(money(row.total, service.currency))}${row.pending_count ? ' *' : ''}</strong>
+            <div class="annual-payments-plot" aria-hidden="true">
+              <span class="annual-payments-baseline" style="bottom:${baseline}px"></span>
+              <span class="annual-payments-bar ${row.pending_count ? 'pending' : ''}"
+                style="height:${height}px;${position}"></span>
+            </div>
+            <b>${row.year}</b>
+            <small>${row.invoice_count} fatura</small>
+            ${row.pending_count ? `<small class="field-warning">${row.pending_count} tutar bekliyor</small>` : ''}
+          </li>`;
+        }).join('')}
+      </ul>
+    </div>
+    ${rows.some((row) => row.pending_count)
+      ? '<p class="service-hint">* Kontrol bekleyen fatura tutarları henüz toplama dahil değil.</p>'
+      : ''}
+  </figure>`;
+}
+
+function renderAnnualPayments(service) {
+  const rows = service.annual_payments || [];
+  return /* HTML */ `<section class="card form-card">
+    <h2>Yıllık ödemeler</h2>
+    <p class="service-hint">
+      Fatura tarihine göre yıllık harcama ve ödenmiş fatura sayısı.
+      Eski yılları “Hizmeti düzenle” bölümünden girebilirsiniz.
+      Yeni faturaların tutarları onaylandığında otomatik eklenir.
+    </p>
+    ${annualPaymentsChart(service)}
+    ${rows.length ? /* HTML */ `<div class="table-wrap">
+      <table class="invoice-table service-history">
+        <thead><tr><th>Yıl</th><th>Fatura sayısı</th><th>Ödenen toplam</th><th>Elle girilen</th><th>Otomatik eklenen</th></tr></thead>
+        <tbody>${rows.map((row) => /* HTML */ `<tr>
+          <td>${row.year}</td>
+          <td>${row.invoice_count}</td>
+          <td>${esc(money(row.total, service.currency))}
+            ${row.pending_count ? `<small class="field-warning">${row.pending_count} faturanın tutarı kontrol bekliyor; toplam eksik.</small>` : ''}
+          </td>
+          <td>${row.manual_count} fatura · ${esc(money(row.manual_total, service.currency))}
+            ${row.through_date ? `<small>${esc(shortDate(row.through_date))} dahil</small>` : ''}
+          </td>
+          <td>${row.automatic_count} fatura · ${esc(money(row.automatic_total, service.currency))}
+            ${row.covered_count ? `<small>${row.covered_count} eski PDF elle girilen döneme dahil; tekrar sayılmadı.</small>` : ''}
+          </td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>` : '<p>Henüz yıllık ödeme bilgisi yok. Excel’deki son hizmet bedeli yıllık toplam harcama olarak alınmaz.</p>'}
+    ${service.undated_payment_count
+      ? `<p class="field-warning">${service.undated_payment_count} faturanın tarihi eksik; yıllık dağılıma eklenemedi.</p>`
+      : ''}
+  </section>`;
+}
+
+// Ondalık bedeli tam sayı adediyle hassasiyet kaybı olmadan çarpar.
+function annualPaymentTotal(amount, count) {
+  if (!/^\d{1,18}(?:\.\d{1,6})?$/.test(amount) || !/^\d{1,7}$/.test(count)) return null;
+  if (Number(count) > 1000000) return null;
+  const [whole, fraction = ''] = amount.split('.');
+  const product = (BigInt(whole + fraction) * BigInt(count)).toString();
+  if (!fraction.length) return product;
+  const digits = product.padStart(fraction.length + 1, '0');
+  const decimals = digits.slice(-fraction.length).replace(/0+$/, '');
+  return digits.slice(0, -fraction.length) + (decimals ? `.${decimals}` : '');
+}
+
+function appendAnnualPaymentRow(container, year, entry = {}, getAmount) {
+  const row = document.createElement('div');
+  row.className = 'annual-payment-row';
+  row.innerHTML = /* HTML */ `
+    <label class="field">
+      <span>Yıl</span>
+      <input
+        data-annual="year" type="number" min="1000" max="2999" step="1"
+        value="${esc(year)}" required
+      />
+    </label>
+    <label class="field">
+      <span>Fatura sayısı</span>
+      <input
+        data-annual="invoice_count" type="number" min="0" max="1000000" step="1"
+        value="${esc(entry.invoice_count ?? '')}" required
+      />
+    </label>
+    <label class="field">
+      <span>Ödenen toplam</span>
+      <input
+        data-annual="total" inputmode="decimal" placeholder="140.000"
+        value="${esc(numeric(entry.total))}" required
+      />
+    </label>
+    <label class="field">
+      <span>Kapsadığı son tarih (dahil)</span>
+      <input
+        data-annual="through_date" type="date"
+        value="${esc(entry.through_date || '')}" required
+      />
+    </label>
+    <p class="service-hint" data-payment-calculation aria-live="polite"></p>
+    <button type="button" class="btn btn-light" data-remove-year>Yılı kaldır</button>`;
+  const field = (key) => row.querySelector(`[data-annual="${key}"]`);
+  const hint = row.querySelector('[data-payment-calculation]');
+  row.recalculate = () => {
+    const year = field('year').value;
+    const amount = getAmount(year);
+    const count = field('invoice_count').value;
+    const total = annualPaymentTotal(amount, count);
+    field('total').value = total === null ? '' : numeric(total);
+    row.dataset.calculated = 'true';
+    hint.textContent = total !== null
+      ? `${year} hizmet bedeli ${numeric(amount)} × ${count} fatura. Yıl içinde bedel değiştiyse toplamı düzeltin.`
+      : /^\d{4}$/.test(year) && !amount
+        ? `${year} hizmet bedelini yukarıdaki başlangıç verilerine girin veya toplamı elle yazın.`
+        : 'Hesaplamak için yıl ve fatura sayısını girin.';
+    if (/^[12]\d{3}$/.test(year) && !field('through_date').value) {
+      const today = new Date();
+      field('through_date').value = Number(year) === today.getFullYear()
+        ? `${year}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        : `${year}-12-31`;
+    }
+  };
+  field('year').oninput = () => {
+    field('through_date').value = '';
+    row.recalculate();
+  };
+  field('invoice_count').oninput = row.recalculate;
+  field('total').oninput = () => {
+    delete row.dataset.calculated;
+    hint.textContent = 'Toplam elle düzenlendi.';
+  };
+  row.querySelector('[data-remove-year]').onclick = () => row.remove();
+  container.append(row);
+}
+
+// Hizmete bağlı faturalar mevcut inceleme ve onay akışında düzenlenir.
+function renderServiceInvoices(history) {
+  return /* HTML */ `<div class="table-wrap">
+    <table class="invoice-table service-history">
+      <thead>
+        <tr>
+          <th>Fatura no</th><th>Fatura tarihi</th><th>Genel tutar</th>
+          <th>Ödeme</th><th>Kontrol</th><th>İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${history.map((invoice) => {
+          const href = `#document/${encodeURIComponent(invoice.id)}`;
+          return /* HTML */ `<tr>
+            <td>
+              <a class="service-link" href="${href}">${esc(invoice.invoice_number || 'Numara okunmadı')}</a>
+              ${invoice.in_reference ? '<small> · Excel toplamına dahil</small>' : ''}
+            </td>
+            <td>${esc(invoice.invoice_date || '—')}</td>
+            <td>${esc(money(invoice.gross, invoice.currency))}</td>
+            <td>Ödendi</td>
+            <td>${invoice.status === 'approved' ? 'Onaylandı' : 'Kontrol bekliyor'}</td>
+            <td><a class="btn btn-light" href="${href}">Faturayı düzenle</a></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function showServiceEditor(service) {
+  const record = service.editable;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'service-dialog service-edit-dialog';
+  const input = (label, name, value, attributes = '') => /* HTML */ `
+    <label class="field">
+      <span>${esc(label)}</span>
+      <input name="${esc(name)}" value="${esc(value ?? '')}" ${attributes} />
+    </label>`;
+  dialog.innerHTML = /* HTML */ `<form>
+    <h2>Hizmeti düzenle</h2>
+    <div class="form-grid">
+      ${input('Kurum', 'institution', record.institution, 'required maxlength="300"')}
+      ${input('Hizmet adı / açıklaması', 'description', record.description, 'required maxlength="300"')}
+      ${serviceTypeField(record.service_type)}
+      ${input('Hizmet başlangıç tarihi', 'start_date', record.start_date, 'type="date"')}
+      <div data-end-date>
+        ${input('Hizmet bitiş tarihi', 'end_date', record.end_date, 'type="date"')}
+        ${!Object.hasOwn(record, 'end_date') && service.end_period
+          ? `<p class="service-hint">Nottaki bitiş: ${servicePeriod(service.end_period)}. Kesin günü biliyorsanız girin.</p>`
+          : ''}
+      </div>
+      ${input('Tek seferlik hizmet tarihi', 'single_date', record.single_date, 'type="date"')}
+    </div>
+    ${!Object.hasOwn(record, 'start_date') && service.start_period
+      ? `<p class="service-hint">Nottaki başlangıç: ${servicePeriod(service.start_period)}. Gün bilgisi yok; kesin tarihi biliyorsanız yukarıya girin.</p>`
+      : ''}
+    <label class="field">
+      <span>Hizmet notu</span>
+      <textarea name="note" rows="4" maxlength="10000">${esc(record.note || '')}</textarea>
+    </label>
+    <h3>Başlangıç verileri</h3>
+    <p class="service-hint">
+      Bu alanlar Excel başlangıcını düzeltir. Yeni yüklenen faturalar ayrıca eklenir.
+      Bağlı faturanın tarihini veya tutarını değiştirmek için fatura geçmişindeki
+      “Faturayı düzenle” seçeneğini kullanın. Para birimi: ${esc(service.currency)}.
+    </p>
+    <div class="form-grid">
+      ${Object.entries(record.amounts).map(([year, value]) =>
+        input(`${year} hizmet bedeli`, `amount-${year}`, value, 'type="number" min="0" step="0.000001"'),
+      ).join('')}
+      ${input('Başlangıç fatura sayısı', 'invoice_count', record.invoice_count || 0, 'type="number" min="0" max="1000000" step="1" required')}
+      ${input('Birim fiyat', 'unit_price', record.unit_price, 'type="number" min="0" step="0.000001"')}
+    </div>
+    <h3>Geçmiş yıllık ödemeler</h3>
+    <p class="service-hint">
+      Yıl ve fatura sayısını girin; yılın hizmet bedeliyle çarpılarak toplam hesaplanır.
+      Yıl içinde bedel değiştiyse toplamı elle düzeltin.
+      Geçmiş yıllar için yıl sonu otomatik seçilir; kapsanan son tarihi değiştirebilirsiniz.
+      O tarih ve öncesindeki faturalar bu toplama dahil kabul edilir; yalnızca sonraki
+      faturalar otomatik eklenir. Böylece eski PDF'ler tekrar sayılmaz.
+    </p>
+    <div id="annual-payment-inputs"></div>
+    <button type="button" class="btn btn-light" id="add-payment-year">${icon('plus')} Yıllık ödeme ekle</button>
+    <p class="service-dialog-error" role="alert"></p>
+    <div class="approval-actions">
+      <button type="button" class="btn btn-light" data-cancel>Vazgeç</button>
+      <button type="submit" class="btn btn-primary">Değişiklikleri kaydet</button>
+    </div>
+  </form>`;
+  document.body.append(dialog);
+  const annualInputs = dialog.querySelector('#annual-payment-inputs');
+  const endDateField = dialog.querySelector('[data-end-date]');
+  const updateEndDateVisibility = () => {
+    const ended = dialog.querySelector('[name="service_type"]').value.trim() === 'Bitti';
+    endDateField.hidden = !ended;
+    endDateField.querySelector('input').disabled = !ended;
+  };
+  dialog.querySelector('[name="service_type"]').addEventListener('input', updateEndDateVisibility);
+  updateEndDateVisibility();
+  const getAmount = (year) => dialog.querySelector(`[name="amount-${year}"]`)?.value || '';
+  Object.entries(record.yearly_payments || {}).sort().forEach(([year, entry]) => {
+    appendAnnualPaymentRow(annualInputs, year, entry, getAmount);
+  });
+  dialog.querySelector('#add-payment-year').onclick = () => {
+    appendAnnualPaymentRow(annualInputs, '', {}, getAmount);
+    annualInputs.lastElementChild.querySelector('input').focus();
+  };
+  dialog.querySelectorAll('[name^="amount-"]').forEach((input) => {
+    input.addEventListener('input', () => {
+      annualInputs.querySelectorAll('.annual-payment-row').forEach((row) => {
+        if (row.dataset.calculated && row.querySelector('[data-annual="year"]').value === input.name.slice(7)) {
+          row.recalculate();
+        }
+      });
+    });
+  });
+  dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelector('form').onsubmit = async (event) => {
+    event.preventDefault();
+    const submit = dialog.querySelector('[type="submit"]');
+    submit.disabled = true;
+    const values = Object.fromEntries(new FormData(event.target));
+    // Başka bir alan kaydedilirken nottan gelen başlangıç bilgisi silinmez.
+    if (!Object.hasOwn(record, 'start_date') && !values.start_date) {
+      delete values.start_date;
+    }
+    if (!Object.hasOwn(record, 'end_date') && !values.end_date) {
+      delete values.end_date;
+    }
+    try {
+      const yearlyPayments = {};
+      for (const row of annualInputs.querySelectorAll('.annual-payment-row')) {
+        const value = (key) => row.querySelector(`[data-annual="${key}"]`).value;
+        const year = value('year');
+        if (Object.hasOwn(yearlyPayments, year)) {
+          throw new Error('Aynı yıl için tek bir ödeme toplamı girin.');
+        }
+        yearlyPayments[year] = {
+          invoice_count: Number(value('invoice_count')),
+          total: decimalInput(value('total')),
+          through_date: value('through_date'),
+        };
+      }
+      await api(`/api/services/${encodeURIComponent(service.id)}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          revision: service.edit_revision,
+          record: {
+            ...values,
+            yearly_payments: yearlyPayments,
+            invoice_count: Number(values.invoice_count),
+            amounts: Object.fromEntries(Object.keys(record.amounts).map((year) =>
+              [year, values[`amount-${year}`] || null],
+            )),
+          },
+        }),
+      });
+      dialog.close();
+      // Detay ve ana tablo aynı sunucu hesabını kullanır; eski sonuç önbellekte kalmaz.
+      state.increaseData = null;
+      await navigate();
+      toast('Hizmet güncellendi. Analizler yeniden hesaplandı.');
+    } catch (error) {
+      dialog.querySelector('[role="alert"]').textContent = error.message;
+      submit.disabled = false;
+    }
+  };
+  dialog.showModal();
 }
 
 // Sunucuyla aynı şekilde yalnızca yazım farkları giderilir; A/4 gibi OCR düzeltmesi yapılmaz.

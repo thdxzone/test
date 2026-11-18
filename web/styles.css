@@ -3248,6 +3248,155 @@ button {
   color: #b52c41;
 }
 
+.service-edit-dialog {
+  width: min(720px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+.service-edit-dialog .form-grid .field {
+  min-width: 0;
+  margin: 12px 0;
+}
+
+.service-edit-dialog textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.annual-payments-chart {
+  margin: 24px 0;
+}
+
+.annual-payments-chart figcaption {
+  margin-bottom: 20px;
+  color: #65758b;
+  font-size: 13px;
+}
+
+.annual-payments-scroll {
+  overflow-x: auto;
+  padding: 4px 0 12px;
+}
+
+.annual-payments-scroll:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
+}
+
+.annual-payments-columns {
+  display: flex;
+  gap: 20px;
+  min-width: 100%;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.annual-payments-column {
+  flex: 1;
+  min-width: 130px;
+  text-align: center;
+}
+
+.annual-payments-column strong,
+.annual-payments-column b,
+.annual-payments-column small {
+  display: block;
+}
+
+.annual-payments-column strong {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #214b90;
+}
+
+.annual-payments-column b {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.annual-payments-column small {
+  margin-top: 6px;
+  color: #65758b;
+  font-size: 12px;
+}
+
+.annual-payments-plot {
+  position: relative;
+  height: 180px;
+  background: repeating-linear-gradient(to top, #edf2f8 0 1px, transparent 1px 45px);
+}
+
+.annual-payments-baseline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #bac9dd;
+}
+
+.annual-payments-bar {
+  position: absolute;
+  left: 50%;
+  width: 48px;
+  transform: translateX(-50%);
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(to top, #214b90, #159ec0);
+  transition: filter 0.2s;
+}
+
+.annual-payments-column:hover .annual-payments-bar {
+  filter: brightness(1.12);
+}
+
+.annual-payments-bar.pending {
+  background: repeating-linear-gradient(135deg, #7b9fc9 0 7px, #a7c8e0 7px 14px);
+}
+
+.annual-payment-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #dce5f0;
+  border-radius: 12px;
+}
+
+.annual-payment-row .field {
+  min-width: 0;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .annual-payment-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .service-page .page-heading {
+    flex-direction: column;
+  }
+
+  .service-page .heading-actions {
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .service-page .heading-actions .approval-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .service-page .heading-actions .btn {
+    font-size: 12px;
+    height: auto;
+  }
+}
+
 @media (max-width: 1000px) {
   .service-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
