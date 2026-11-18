@@ -15,8 +15,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 # Poppler PDF'leri render eder; Tesseract küçük miktar hücrelerinde yardımcıdır.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    poppler-utils tesseract-ocr tesseract-ocr-tur tesseract-ocr-eng \
-    libgl1 libglib2.0-0 libgomp1 curl ca-certificates tzdata \
+    curl poppler-utils tesseract-ocr tesseract-ocr-tur libgl1 libglib2.0-0 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements-paddle.txt requirements-production.txt ./
 RUN python -m pip install -r requirements-production.txt \
