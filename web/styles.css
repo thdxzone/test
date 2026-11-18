@@ -3264,6 +3264,55 @@ button {
   resize: vertical;
 }
 
+.pdf-split-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  margin: 18px 0;
+  border: 1px solid #d9e6f2;
+  border-radius: 12px;
+  background: #f4f9fd;
+  cursor: pointer;
+}
+
+.pdf-split-option input {
+  margin-top: 3px;
+  accent-color: #214b90;
+}
+
+.pdf-split-option strong,
+.pdf-split-option small {
+  display: block;
+}
+
+.pdf-split-option small {
+  margin-top: 6px;
+  color: #65758b;
+  line-height: 1.6;
+}
+
+.pdf-split-toolbar {
+  margin: 0 0 20px;
+}
+
+.batch-navigation {
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.batch-navigation p {
+  color: #65758b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.batch-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .annual-payments-chart {
   margin: 24px 0;
 }

@@ -1,7 +1,7 @@
 """Belge kullanmadan algılama ve Latin metin tanıma motorunu doğrular."""
 
 from PIL import Image, ImageDraw, ImageFont
-from lab_engines.paddle_reader import PaddleBackend
+from ocr.paddle_reader import PaddleBackend
 
 
 def main():

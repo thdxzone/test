@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 import unittest
 from PIL import Image, ImageDraw
-from lab_engines.paddle_reader import PaddleBackend
+from ocr.paddle_reader import PaddleBackend
 
 
 class PaddleNumericTests(unittest.TestCase):

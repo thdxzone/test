@@ -15,7 +15,7 @@ sudo mkdir -p /srv/fatura/backups
 sudo chown -R 10001:10001 /srv/fatura/data /srv/fatura/backups
 ```
 
-Aktarım aracı dolu hedefe yazmaz. Sonraki deploy'larda bu komutu tekrarlamayın. Git'teki kayıtlar aktarım anının görüntüsüdür; çalışan sunucudaki verinin yerine geçirilmez. İlk aktarımın kaynağı başka bilgisayarda daha güncelse önce o bilgisayardan güncel `data` yedeği alın. Laboratuvar ve Qwen üretim imajına alınmaz; özel laboratuvar kayıtları repoda korunur.
+Aktarım aracı dolu hedefe yazmaz. Sonraki deploy'larda bu komutu tekrarlamayın. Git'teki kayıtlar aktarım anının görüntüsüdür; çalışan sunucudaki verinin yerine geçirilmez. İlk aktarımın kaynağı başka bilgisayarda daha güncelse önce o bilgisayardan güncel `data` yedeği alın. Eski deney arayüzü güncel projeden kaldırılmıştır. Ana OCR kodu `ocr/`, ağırlıklar `models/paddlex/official_models/` altındadır; yerel `backups/` arşivi imaja alınmaz.
 
 ## 2. Coolify'de uygulama oluştur
 

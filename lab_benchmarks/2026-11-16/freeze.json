@@ -1,6 +1,0 @@
-{
-  "code_sha256": "e2146220c0b4b31e227ae1ab9e273188a58d41c1fdbb84e4b2c450172251fa15",
-  "date": "2026-11-16",
-  "policy": "Holdout OCR çıktısı ve referansları görülmeden önce sabitlendi. Bu deneyde holdout hatalarına göre çıkarım kodu değiştirilmeyecek.",
-  "reference_scope": "Numara/tarih/para birimi, kalem sayısı, miktar/birim fiyat/KDV oranı/satır tutarı ve genel toplamlar. Metin adları/notlar bu skora dahil değil."
-}

@@ -9,12 +9,9 @@
 *.pem
 *.key
 data
-lab_data
-lab_benchmarks
+backups
 tmp
 output
-lab_models/*
-!lab_models/paddlex/
-lab_models/paddlex/*
-!lab_models/paddlex/official_models/
+models/paddlex/*
+!models/paddlex/official_models/
 **/.cache

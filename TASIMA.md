@@ -1,57 +1,35 @@
-# Başka bilgisayara kurulum
+# Başka bilgisayara aktarım
 
-Bu depo mevcut fatura PDF'lerini, Excel başlangıç verilerini, ana sistem ve laboratuvar veritabanlarını içerir. **Depoyu private tutun.** GitHub'a eriştiğiniz hesap başka bilgisayarda da bu repoya erişebilmelidir.
-
-## İndirme
-
-Git ile klonlayın:
+## Kaynak kodunu alma
 
 ```sh
 git clone https://github.com/Oguzhan1511/fatura_sistemi.git
 cd fatura_sistemi
 ```
 
-GitHub'dan ZIP indiriyorsanız bütün klasörleri birlikte çıkarın. `data`, `lab_data` ve `lab_benchmarks` özel kayıtları içerir; yalnızca Python dosyalarını almak mevcut kayıtları taşımaz.
+ZIP indiriyorsanız bütün klasörleri birlikte çıkarın. Mevcut ana kayıtlar `data/`, yerel OCR ağırlıkları `models/` içindedir.
 
-## Ana sistemi kurma
+## Yerel kurulum
 
-Python **3.12** kurun. Windows'ta `Kurulum.bat`, macOS'ta `Kurulum.command` dosyasını çalıştırın. Terminalden eşdeğeri:
-
-```sh
-# Windows:
-py -3.12 scripts/setup_local.py
-# macOS / Linux:
-python3.12 scripts/setup_local.py
-```
-
-Kurulum internet erişimi ister. Paketler `.venv-ocr` içine kurulur; başka bilgisayarın sanal ortamı kopyalanmaz. PDF'lerin okunması için ayrıca **Poppler** kurup `pdftoppm` komutunu PATH'e ekleyin. İsteğe bağlı **Tesseract**, küçük miktar hücrelerinde yardımcı okuma sağlar. macOS'ta sistem paketleri Homebrew ile `brew install poppler tesseract` komutuyla kurulabilir. Windows/Linux'ta aynı araçların işletim sistemine uygun sürümlerini kurun. `pdftoppm -v` ve `tesseract --version` komutlarıyla erişimi kontrol edin.
-
-## Başlatma
-
-Windows: `Baslat.bat`. macOS: `Baslat.command`. Terminal:
+Python 3.12 kurun. Windows'ta `Kurulum.bat`, macOS'ta `Kurulum.command` veya terminalde:
 
 ```sh
-python start_local.py --open
+python3 scripts/setup_local.py
+python3 start_local.py --open
 ```
 
-Adres: http://127.0.0.1:8765
+Kurulum, hedef bilgisayara uygun paketleri `.venv-ocr` içine kurar. Sanal ortamı başka bilgisayardan kopyalamayın. PDF önizleme ve OCR için Poppler kurup `pdftoppm` komutunu PATH'e ekleyin. Tesseract küçük miktar hücrelerinde isteğe bağlı yardımcıdır. macOS'ta `brew install poppler tesseract` kullanılabilir.
 
-Ana sistem `.venv-ocr` ortamını otomatik bulur. Veriler `data` altında korunur; tekrar içe aktarma gerekmez. Kullanıcı açıklamalarına göre hizmet eşleştirme, zam analizi, fatura numarası araması ve mükerrer engelleme birlikte taşınır. Önceden üretilmiş PDF önizlemeleri de verilerle birlikte gelir.
+Arayüz http://127.0.0.1:8765 adresindedir. Ubuntu ARM64 ve Coolify kurulumu [COOLIFY.md](COOLIFY.md) içinde anlatılır. Windows'ta uçtan uca çalışma henüz doğrulanmadı; yerel macOS ve Linux ARM64 OCR ortamları test edildi.
 
-Türkçe PaddleOCR mobil model ağırlıkları `lab_models/paddlex/official_models` içindedir. Bunlar ana okuyucunun kullandığı yerel modellerdir. Ağır OCR süreci hedef bilgisayardaki yeni Python ortamını kullanır. Bu proje macOS Apple Silicon üzerinde doğrulandı; Windows/Linux'ta uçtan uca doğrulama henüz yapılmadı.
+## Güncelleme ve veri
 
-## Laboratuvar ve isteğe bağlı Qwen
-
-Ana sistem için Qwen gerekmez. Laboratuvar kayıtları `lab_data` içinde, deney kaynakları `lab_benchmarks` içinde korunur. Qwen'in yaklaşık 1,7 GB ağırlığı ve eski Mac sanal ortamı Git'e eklenmez; Windows/Linux, Mac'e özel MLX motorunu çalıştıramaz.
-
-Apple Silicon Mac'te Qwen deneyi için `requirements-lab-macos.lock.txt` önceki ortamın sürüm kaydıdır. Uygun `.venv-lab` ortamına bu bağımlılıklar kurulup `python scripts/download_qwen_lab.py` çalıştırılarak sabit revizyonlu model yeniden indirilebilir. Laboratuvar arayüzünde modellerin hazır bilgisi yeni kurulumda ayrıca doğrulanmalıdır; önceki bilgisayarın hazır işareti taşınmaz. Ana sistemin PaddleOCR kurulumu bundan bağımsızdır.
-
-## Yedek ve sonraki Git güncellemeleri
-
-Kayıt ekledikten sonra bütün `data` ve `lab_data` klasörlerini ayrıca yedekleyin. Git'teki veri tabanları aktarım anının kopyasıdır; başka bilgisayardaki yeni kayıtları otomatik eşitlemez. Çalışan uygulamanın verilerini zorla `git reset --hard` ile sıfırlamayın. Güncelleme veya bilgisayarlar arası birleştirme öncesinde uygulamayı durdurup bu klasörlerin yedeğini alın.
-
-Testler:
+Yeni kayıtlar eklenmişse güncellemeden önce `data/` dizininin tutarlı yedeğini alın:
 
 ```sh
-python -m unittest discover -s tests -q
+python -m scripts.backup_data --source data --output /yedekler/fatura.zip
 ```
+
+Git'teki veritabanı aktarım anının kopyasıdır. Çalışan sunucudaki daha yeni kayıtların yerine geçirmeyin. Kaynak kodunu güncellemek için `git pull origin main` kullanın; veri dosyası çakışması varsa mevcut veriyi koruyup yedekten karar verin. Coolify'da `/data` kalıcı diski yeni imajdan bağımsızdır.
+
+Ana sistem Türkçe PaddleOCR kullanır; kod `ocr/`, ağırlıklar `models/paddlex/official_models/` içindedir. Eski deney arayüzü ve deney kayıtları güncel repoda yer almaz. Kaynak bilgisayardaki arşiv `backups/retired-lab-2026-11-18/` altında yerelde korunur.

@@ -11,11 +11,12 @@ const state = {
   form: null,
   dirty: false,
   uploading: false,
+  splitPages: false,
   saving: false,
   page: 1,
   zoom: 100,
   list: { query: '', number: '', status: 'all', currency: 'all', from: '', to: '' },
-  invoiceView: document.querySelector('#lab-reader') ? 'records' : 'analysis',
+  invoiceView: 'analysis',
   increaseData: null,
   increaseFilter: { query: '', type: 'all' },
   analyticsCurrency: 'TRY',
@@ -133,6 +134,7 @@ const statusText = (status) =>
     approved: 'Onaylandı',
     review: 'İnceleme bekliyor',
     processing: 'Okunuyor',
+    duplicate: 'Zaten kayıtlı',
   })[status] || 'İnceleme bekliyor';
 const badge = (status) =>
   /* HTML */ `<span class="status ${status === 'approved' ? '' : status}"
@@ -261,7 +263,9 @@ async function navigate() {
       state.zoom = 100;
       setDock('invoices');
       renderReview();
-      if (state.current.status === 'processing') pollDocument(id);
+      if (state.current.status === 'processing' || state.current.batch_documents?.some((doc) => doc.status === 'processing')) {
+        pollDocument(id);
+      }
     } else if (route.startsWith('service/')) {
       setDock('invoices');
       const service = await api(`/api/services/${encodeURIComponent(route.split('/')[1])}`);
@@ -553,6 +557,12 @@ function renderUpload() {
     <div class="upload-grid">
       <section class="card upload-card">
         <div class="section-kicker">BELGENİZİ SEÇİN</div>
+        <label class="pdf-split-option">
+          <input type="checkbox" id="split-pdf-pages" ${state.splitPages ? 'checked' : ''} />
+          <span><strong>Her sayfa ayrı fatura</strong>
+            <small>Örneğin 4 sayfalık PDF → 4 ayrı fatura. Sayfalar sırayla okunur.</small>
+          </span>
+        </label>
         <div
           class="dropzone"
           id="dropzone"
@@ -600,6 +610,9 @@ function renderUpload() {
         </div>`
       : ''}${footer()}
   </div>`;
+  $('#split-pdf-pages')?.addEventListener('change', (event) => {
+    state.splitPages = event.target.checked;
+  });
   const drop = $('#dropzone');
   drop.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -637,13 +650,15 @@ async function upload(file) {
   state.uploading = true;
   toast('Belgeniz yükleniyor…');
   try {
-    const doc = await api(`/api/uploads?name=${encodeURIComponent(file.name)}`, {
+    const mode = state.splitPages ? '&split=pages' : '';
+    const doc = await api(`/api/uploads?name=${encodeURIComponent(file.name)}${mode}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
       body: file,
     });
     state.dirty = false;
     location.hash = `document/${doc.id}`;
+    if (doc.documents) toast(`${doc.documents.length} fatura sayfa sırasıyla okuma kuyruğuna eklendi.`);
   } catch (e) {
     toast(e.message);
   } finally {
@@ -657,11 +672,22 @@ async function pollDocument(id) {
     if (state.route !== `document/${id}`) return;
     try {
       const doc = await api(`/api/documents/${id}`);
-      state.current = doc;
-      state.form = structuredClone(doc.edited);
-      renderReview();
-      if (doc.status === 'processing') pollDocument(id);
-      else {
+      if (state.route !== `document/${id}`) return;
+      const wasProcessing = state.current.status === 'processing';
+      if (wasProcessing) {
+        state.current = doc;
+        state.form = structuredClone(doc.edited);
+        renderReview();
+      } else {
+        // Diğer sayfalar okunurken kullanıcının açık formdaki düzeltmeleri korunur.
+        state.current.batch_documents = doc.batch_documents;
+        const navigation = app.querySelector('.batch-navigation');
+        if (navigation) navigation.outerHTML = renderBatchNavigation(doc);
+      }
+      if (doc.status === 'processing' || doc.batch_documents?.some((item) => item.status === 'processing')) {
+        pollDocument(id);
+      }
+      if (wasProcessing && doc.status !== 'processing') {
         await loadDocuments();
         toast(
           doc.status === 'duplicate'
@@ -761,6 +787,10 @@ function renderReview() {
         : ''}
       <a href="#invoices" class="btn btn-light">Listeye dön ${icon('arrow')}</a>
     </div>
+    ${renderBatchNavigation(d)}
+    ${d.mime === 'application/pdf' && !d.batch_id && !processing
+      ? `<div class="pdf-split-toolbar"><button class="btn btn-light" data-action="split-invoice-pages">${icon('files')} Her sayfayı ayrı fatura olarak oku</button></div>`
+      : ''}
     <div class="review-grid">
       <aside class="card preview-panel">
         <div class="preview-head">
@@ -847,6 +877,27 @@ function renderReview() {
 }
 
 // Tek oran varsayılmaz; farklı KDV oranları ayrı ayrı gösterilir.
+function renderBatchNavigation(doc) {
+  if (!doc.batch_documents?.length) return '';
+  const completed = doc.batch_documents.filter((item) => item.status !== 'processing').length;
+  const reading = doc.batch_documents.find((item) => item.status === 'processing');
+  return /* HTML */ `<nav class="card batch-navigation" aria-label="PDF içindeki faturalar">
+    <div>
+      <strong>PDF içindeki ${doc.batch_count} fatura</strong>
+      <p>Okunan: ${completed}/${doc.batch_documents.length} · Şu an ${doc.batch_page}. faturadasınız. Her fatura ayrı onaylanır.</p>
+    </div>
+    <div class="batch-links">
+      ${doc.batch_documents.map((item) => /* HTML */ `
+        <a class="btn ${item.id === doc.id ? 'btn-primary' : 'btn-light'}"
+          href="#document/${encodeURIComponent(item.id)}"
+          ${item.id === doc.id ? 'aria-current="page"' : ''}
+          title="${esc(item.filename)} · ${item.status === 'processing' && reading?.id !== item.id ? 'Sırada' : esc(statusText(item.status))}">
+          Fatura ${item.batch_page}
+        </a>`).join('')}
+    </div>
+  </nav>`;
+}
+
 function vatRatesSummary(record) {
   const rates = [
     ...new Set(
@@ -938,7 +989,7 @@ function renderForm(approved, r) {
           </details>`
         : ''}
     </div>
-    ${document.querySelector('#lab-reader') ? '' : renderServiceField()}
+    ${renderServiceField()}
     <section class="card form-card">
       <div class="form-section-title">
         <h2>${icon('building')} Satıcı bilgileri</h2>
@@ -1405,9 +1456,7 @@ function renderInvoiceRecords() {
       'BELGE ARŞİVİNİZ',
       'Faturalar',
       'Tüm belgeleriniz, inceleme durumları ve onaylanan kayıtlarınız bir arada.',
-      (document.querySelector('#lab-reader')
-        ? ''
-        : button('Zam analizine dön', 'chart', 'view-analysis', 'btn-light')) +
+      button('Zam analizine dön', 'chart', 'view-analysis', 'btn-light') +
         button('Yeni fatura'),
     )}
     <div class="list-stats">
@@ -1881,6 +1930,30 @@ document.addEventListener('click', async (e) => {
   const target = e.target.closest('[data-action]');
   if (!target) return;
   const action = target.dataset.action;
+  if (action === 'split-invoice-pages') {
+    if (state.dirty && !(await canLeave())) return;
+    const confirmed = await dialog(
+      'PDF içindeki faturaları ayır',
+      'Her sayfa ayrı bir faturaysa devam edin. Bu birleşik kayıt listeden ve analizlerden kaldırılır; sayfalar ayrı kayıtlar olarak sırayla okunur. Her faturayı ayrıca kontrol edip onaylayacaksınız.',
+      'Sayfaları ayrı oku',
+    );
+    if (!confirmed) return;
+    target.disabled = true;
+    try {
+      const result = await api(`/api/documents/${state.current.id}/split`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revision: state.current.revision }),
+      });
+      state.dirty = false;
+      location.hash = `document/${result.id}`;
+      toast(`${result.documents.length} fatura sırayla okunacak.`);
+    } catch (error) {
+      toast(error.message);
+      target.disabled = false;
+    }
+    return;
+  }
   if (action === 'correct-duplicate') {
     state.showDuplicateForm = true;
     renderReview();
@@ -2651,11 +2724,15 @@ function renderDuplicateInvoice(doc) {
       'Bu fatura zaten mevcut.',
       'Aynı fatura numarası ikinci kez listeye ve analizlere eklenmedi.',
     )}
+    ${renderBatchNavigation(doc)}
     <section class="card form-card">
       <h2>${esc(doc.edited?.invoice_number || '')}</h2>
       <p>${esc(doc.filename)}</p>
       <p>Numara okunduktan sonra sistemdeki faturalarla karşılaştırıldı.</p>
       <div class="approval-actions">
+        ${doc.mime === 'application/pdf' && !doc.batch_id
+          ? '<button class="btn btn-light" data-action="split-invoice-pages">Her sayfayı ayrı fatura olarak oku</button>'
+          : ''}
         <a class="btn btn-primary" href="#document/${encodeURIComponent(doc.duplicate_of)}"
           >Mevcut faturayı aç</a
         >

@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from app import Application
 from extraction_service import empty_record
-from lab import LabApplication
 from model_runtime import analyze_paddle
 
 
@@ -49,18 +48,6 @@ class ProductionReaderTests(unittest.TestCase):
             self.assertEqual(saved["status"], "review")
             self.assertEqual(saved["edited"]["reader"], "paddle")
             self.assertIsNone(saved["approved_at"])
-
-    def test_lab_prototype_does_not_switch_to_paddle(self):
-        with tempfile.TemporaryDirectory() as directory:
-            app = LabApplication(directory)
-            self.addCleanup(app.executor.shutdown)
-            doc = app.store.create("b" * 32, "fatura.pdf", "application/pdf")
-            with patch("app.analyze", return_value=empty_record()) as old, patch(
-                "app.analyze_paddle"
-            ) as paddle:
-                app.process(doc["id"])
-            old.assert_called_once()
-            paddle.assert_not_called()
 
     def test_failed_paddle_does_not_silently_use_old_engine(self):
         with tempfile.TemporaryDirectory() as directory:

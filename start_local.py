@@ -6,14 +6,12 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent
-candidates = (
-    [ROOT / ".venv-lab" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")]
-    if "--lab" in sys.argv
-    else []
-) + [
-    ROOT / ".venv-ocr" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"),
-    ROOT / ".venv-lab" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"),
-    ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"),
+executable = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+candidates = [
+    ROOT / ".venv-ocr" / executable,
+    # Eski kurulumdaki çalışan OCR ortamı yeniden indirme gerektirmeden kullanılabilir.
+    ROOT / ".venv-lab" / executable,
+    ROOT / ".venv" / executable,
     Path(sys.executable),
 ]
 if sys.platform == "darwin":
@@ -31,9 +29,7 @@ for candidate in candidates:
     if check.returncode == 0:
         os.chdir(ROOT)
         arguments = sys.argv[1:]
-        entry = "lab.py" if "--lab" in arguments else "app.py"
-        arguments = [arg for arg in arguments if arg != "--lab"]
-        os.execv(str(candidate), [str(candidate), str(ROOT / entry), *arguments])
+        os.execv(str(candidate), [str(candidate), str(ROOT / "app.py"), *arguments])
 print(
     "Gerekli Python paketleri bulunamadı. Önce: python -m pip install -r requirements.txt",
     file=sys.stderr,

@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8765 \
     FATURA_DATA_DIR=/data \
     FATURA_OCR_PYTHON=/usr/local/bin/python \
-    PADDLE_PDX_CACHE_HOME=/app/lab_models/paddlex \
+    PADDLE_PDX_CACHE_HOME=/app/models/paddlex \
     PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True \
     OMP_NUM_THREADS=1 \
     FATURA_OCR_CPU_THREADS=1 \
@@ -23,7 +23,7 @@ RUN python -m pip install -r requirements-production.txt \
 COPY --chown=10001:10001 . .
 RUN groupadd --gid 10001 fatura && useradd --uid 10001 --gid 10001 --create-home fatura \
     && mkdir -p /data /backups \
-    && chown -R 10001:10001 /data /backups /app/lab_models
+    && chown -R 10001:10001 /data /backups /app/models
 USER 10001:10001
 EXPOSE 8765
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \

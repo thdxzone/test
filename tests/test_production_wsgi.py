@@ -183,7 +183,7 @@ class OCRPlatformTests(unittest.TestCase):
     def test_arm_linux_uses_safe_single_thread_without_changing_mac_default(self):
         from unittest.mock import Mock, patch
         from types import SimpleNamespace
-        from lab_engines.paddle_reader import PaddleBackend
+        from ocr.paddle_reader import PaddleBackend
         import os
 
         factory = Mock()
@@ -206,7 +206,7 @@ class OCRPlatformTests(unittest.TestCase):
         from unittest.mock import Mock, patch
         from types import SimpleNamespace
         from PIL import Image, ImageDraw, ImageFont
-        from lab_engines.paddle_reader import PaddleBackend
+        from ocr.paddle_reader import PaddleBackend
 
         backend = object.__new__(PaddleBackend)
         backend.cpu_threads = 1

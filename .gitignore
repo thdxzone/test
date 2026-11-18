@@ -18,10 +18,8 @@ output/
 *.sqlite3-shm
 
 # Büyük, yeniden indirilebilir model ve paket önbellekleri.
-lab_models/*
-!lab_models/paddlex/
-lab_models/paddlex/*
-!lab_models/paddlex/official_models/
+models/paddlex/*
+!models/paddlex/official_models/
 **/.cache/
 *.partial
 

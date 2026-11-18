@@ -1,8 +1,0 @@
-Checking connectivity to the model hosters, this may take a while. To bypass this check, set `DISABLE_MODEL_SOURCE_CHECK` to `True`.
-Model files already exist. Using cached files. To redownload, please delete the directory manually: `/Users/oguzhanozdemir/.paddlex/official_models/latin_PP-OCRv5_mobile_rec`.
-/Users/oguzhanozdemir/Desktop/fatura_sistem/.venv-lab/lib/python3.12/site-packages/paddle/utils/cpp_extension/extension_utils.py:718: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
-  warnings.warn(warning_message)
-F01 0 (1, 0, 109, 53) [('1', 0.343391090631485), ('1', 0.44473615288734436), ('', 0.0), ('1', 0.3595142960548401), ('1', 0.4621901512145996), ('', 0.0)]
-F01 1 (56, 34, 60, 50) [('1', 0.39293113350868225), ('1', 0.6783850789070129), ('1', 0.7065480351448059), ('1', 0.7157998085021973), ('1', 0.7061783075332642), ('1', 0.7458826899528503)]
-F07 1 (61, 39, 65, 56) [('l', 0.3784249424934387), ('1', 0.637093186378479), ('1', 0.5700327754020691), ('1', 0.6939780116081238), ('1', 0.8410742282867432), ('1', 0.6578391790390015)]
-F07 3 (66, 37, 69, 53) [('I', 0.40596532821655273), ('|', 0.29638156294822693), ('|', 0.6409956812858582), ('|', 0.4961899518966675), ('|', 0.3143382668495178), ('|', 0.5569103956222534)]

@@ -53,6 +53,13 @@ class Store:
             }
             if "duplicate_of" not in columns:
                 db.execute("ALTER TABLE documents ADD COLUMN duplicate_of TEXT")
+            for column in (
+                "batch_id TEXT",
+                "batch_page INTEGER",
+                "batch_count INTEGER",
+            ):
+                if column.split()[0] not in columns:
+                    db.execute(f"ALTER TABLE documents ADD COLUMN {column}")
             # Yarım kalan işlemler sessizce kaybolmaz; inceleme için tekrar erişilebilir kalır.
             if recover_processing:
                 db.execute(
@@ -99,6 +106,51 @@ class Store:
                     (identifier,),
                 ).fetchone()
             )
+
+    def create_batch(self, documents, batch_id, replaced=None):
+        """Sayfalar ve varsa birleşik kaydın kaldırılması tek işlemde tamamlanır."""
+        stamp = now()
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if replaced:
+                identifier, revision = replaced
+                cursor = db.execute(
+                    "UPDATE documents SET status='deleted', updated_at=?, revision=revision+1 "
+                    "WHERE id=? AND revision=? AND status NOT IN ('processing','deleted')",
+                    (stamp, identifier, revision),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError(
+                        "Kayıt değişmiş veya halen okunuyor. Sayfayı yenileyin."
+                    )
+            for index, document in enumerate(documents, start=1):
+                db.execute(
+                    "INSERT INTO documents(id,filename,mime,status,created_at,updated_at,"
+                    "batch_id,batch_page,batch_count) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (
+                        document["id"],
+                        document["filename"],
+                        "application/pdf",
+                        "processing",
+                        stamp,
+                        stamp,
+                        batch_id,
+                        index,
+                        len(documents),
+                    ),
+                )
+        return [self.get(document["id"]) for document in documents]
+
+    def batch(self, identifier):
+        with self.connect() as db:
+            return [
+                dict(row)
+                for row in db.execute(
+                    "SELECT id,filename,status,batch_page FROM documents "
+                    "WHERE batch_id=? AND status!='deleted' ORDER BY batch_page",
+                    (identifier,),
+                )
+            ]
 
     def list(self):
         with self.connect() as db:

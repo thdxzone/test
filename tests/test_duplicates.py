@@ -8,7 +8,6 @@ import threading
 import unittest
 
 from invoice import run
-from lab import LabStore
 from storage import Store, DuplicateInvoice, invoice_key
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,15 +99,6 @@ class DuplicateTests(unittest.TestCase):
             sorted(self.store.get(i)["status"] for i in ids), ["duplicate", "review"]
         )
         self.assertEqual(len(self.store.list()), 1)
-
-    def test_lab_keeps_same_invoice_for_model_comparison(self):
-        store = LabStore(
-            self.directory.name, threading.local(), recover_processing=False
-        )
-        for identifier in ["a" * 32, "b" * 32]:
-            store.create(identifier, "fatura.pdf", "application/pdf")
-            store.analyzed(identifier, self.record)
-        self.assertEqual(len(store.list()), 2)
 
 
 if __name__ == "__main__":

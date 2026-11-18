@@ -13,6 +13,8 @@ from pathlib import Path
 import re
 import threading
 import subprocess
+import shutil
+import tempfile
 from urllib.parse import parse_qs, unquote, urlparse
 import uuid
 
@@ -21,6 +23,7 @@ from invoice import number, validate
 from storage import Store, DuplicateInvoice
 from model_runtime import analyze_paddle
 from service_analysis import Services
+from pdf_batch import split_pages
 
 ROOT = Path(__file__).resolve().parent
 MAX_UPLOAD = 25 * 1024 * 1024
@@ -167,13 +170,15 @@ class Application:
         )
         self.preview_lock = threading.Lock()
 
-    def accept_upload(self, data, filename):
+    def accept_upload(self, data, filename, split=False):
         """Yeni belge yüklemeleri yalnızca PDF kabul eder; mevcut kayıtlar korunur."""
         if not data or len(data) > MAX_UPLOAD:
             raise ValueError("Dosya en fazla 25 MB olabilir.")
         if not data.startswith(b"%PDF-"):
             raise ValueError("Lütfen PDF biçiminde bir fatura yükleyin.")
         filename = Path(filename.replace("\\", "/")).name[:180] or "fatura.pdf"
+        if split:
+            return self.accept_batch(data, filename)
         identifier = uuid.uuid4().hex
         directory = self.store.root / "files" / identifier
         directory.mkdir(parents=True)
@@ -181,6 +186,37 @@ class Application:
         doc = self.store.create(identifier, filename, "application/pdf")
         self.executor.submit(self.process, identifier)
         return doc
+
+    def accept_batch(self, data, filename, replaced=None):
+        """Önce PDF'ler, sonra tüm kayıtlar hazırlanır; işler sayfa sırasıyla kuyruğa alınır."""
+        documents = []
+        directories = []
+        batch_id = uuid.uuid4().hex
+        try:
+            with tempfile.TemporaryDirectory(
+                prefix="invoice-batch-", dir=self.store.root
+            ) as work:
+                paths = split_pages(data, work)
+                for index, path in enumerate(paths, start=1):
+                    identifier = uuid.uuid4().hex
+                    directory = self.store.root / "files" / identifier
+                    directory.mkdir()
+                    directories.append(directory)
+                    path.replace(directory / "source")
+                    documents.append(
+                        {
+                            "id": identifier,
+                            "filename": f"{Path(filename).stem[:140]} · sayfa {index}.pdf",
+                        }
+                    )
+                saved = self.store.create_batch(documents, batch_id, replaced)
+        except Exception:
+            for directory in directories:
+                shutil.rmtree(directory, ignore_errors=True)
+            raise
+        for document in saved:
+            self.executor.submit(self.process, document["id"])
+        return {"id": saved[0]["id"], "batch_id": batch_id, "documents": saved}
 
     def process(self, identifier):
         doc = self.store.get(identifier)
@@ -324,6 +360,8 @@ class InvoiceEndpoints:
         if len(parts) >= 3 and parts[:2] == ["api", "documents"]:
             doc = self.document(parts[2])
             if len(parts) == 3:
+                if doc.get("batch_id"):
+                    doc["batch_documents"] = self.app.store.batch(doc["batch_id"])
                 doc["services"] = self.app.services.rows()
                 doc["service_match"] = self.app.services.match(doc.get("edited") or {})
                 return self.send(200, doc)
@@ -393,9 +431,20 @@ class InvoiceEndpoints:
             filename = Path(
                 parse_qs(parsed.query).get("name", ["fatura"])[0].replace("\\", "/")
             ).name[:180]
-            return self.send(201, self.app.accept_upload(data, filename))
+            split = parse_qs(parsed.query).get("split", [""])[0] == "pages"
+            return self.send(201, self.app.accept_upload(data, filename, split=split))
         if len(parts) == 4 and parts[:2] == ["api", "documents"]:
             doc = self.document(parts[2])
+            if parts[3] == "split":
+                if doc["mime"] != "application/pdf" or doc.get("batch_id"):
+                    raise ValueError("Bu belge sayfalara ayrılamaz.")
+                payload = json.loads(self.body())
+                result = self.app.accept_batch(
+                    self.app.store.file(doc["id"]).read_bytes(),
+                    doc["filename"],
+                    replaced=(doc["id"], int(payload["revision"])),
+                )
+                return self.send(201, result)
             if parts[3] == "delete":
                 payload = json.loads(self.body())
                 self.app.store.delete(doc["id"], int(payload["revision"]))

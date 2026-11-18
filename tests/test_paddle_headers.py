@@ -2,7 +2,7 @@
 
 import unittest
 
-from lab_engines.paddle_headers import review_headers
+from ocr.paddle_headers import review_headers
 
 
 def word(text, box):
