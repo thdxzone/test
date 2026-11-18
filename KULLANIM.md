@@ -14,7 +14,7 @@
 
 ## Tek PDF içinde birden fazla fatura
 
-Her sayfasında bağımsız fatura bulunan PDF için **Her sayfa ayrı fatura** seçeneğini işaretleyin. Dört sayfa dört kayıt oluşturur; sayfalar sırayla okunur ve ayrı onaylanır. **Fatura 1, Fatura 2…** bağlantılarıyla aralarında geçebilirsiniz. Bir sayfanın okunamaması diğerlerini durdurmaz.
+Çok sayfalı PDF seçildiğinde sistem önce sayfaların nasıl okunacağını sorar: **Her sayfa ayrı fatura** veya **Tek fatura, birden fazla sayfa**. Düzen seçilmeden kayıt oluşturulmaz. Her sayfanın bağımsız fatura olduğunu biliyorsanız yükleme ekranındaki kutucuğu önceden de işaretleyebilirsiniz. Dört sayfa dört kayıt oluşturur; sayfalar sırayla okunur ve ayrı onaylanır. **Fatura 1, Fatura 2…** bağlantılarıyla aralarında geçebilirsiniz. Bir sayfanın okunamaması diğerlerini durdurmaz.
 
 Daha önce yüklenmiş PDF'nin detayında **Her sayfayı ayrı fatura olarak oku** kullanılabilir. Eski birleşik kayıt listeden ve analizlerden çıkarılır; kaynağı ve geçmişi korunur. Bu işlem 2–30 sayfa ve toplam 100 MB ayrılmış dosya sınırıyla çalışır. Tek faturanın birkaç sayfaya yayıldığı PDF'lerde bu seçeneği kapalı tutun.
 

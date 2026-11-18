@@ -559,7 +559,7 @@ function renderUpload() {
         <div class="section-kicker">BELGENİZİ SEÇİN</div>
         <label class="pdf-split-option">
           <input type="checkbox" id="split-pdf-pages" ${state.splitPages ? 'checked' : ''} />
-          <span><strong>Her sayfa ayrı fatura</strong>
+          <span><strong>Toplu fatura</strong>
             <small>Örneğin 4 sayfalık PDF → 4 ayrı fatura. Sayfalar sırayla okunur.</small>
           </span>
         </label>
@@ -635,6 +635,34 @@ function renderUpload() {
   });
 }
 
+// Çok sayfalı belgeler, kullanıcı düzeni seçmeden OCR kuyruğuna alınmaz.
+function choosePdfLayout(pageCount) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'service-dialog';
+    dialog.innerHTML = /* HTML */ `<h2>PDF ${pageCount} sayfa içeriyor</h2>
+      <p>Bu sayfalar nasıl okunmalı?</p>
+      <div class="pdf-layout-options">
+        <button class="btn btn-primary" data-layout="pages">Toplu fatura</button>
+        <button class="btn btn-light" data-layout="single">Tek fatura, birden fazla sayfa</button>
+        <button class="btn btn-text" data-layout="cancel">Vazgeç</button>
+      </div>`;
+    let choice = null;
+    dialog.querySelectorAll('[data-layout]').forEach((button) => {
+      button.onclick = () => {
+        choice = button.dataset.layout === 'cancel' ? null : button.dataset.layout;
+        dialog.close();
+      };
+    });
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      resolve(choice);
+    }, {once: true});
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+}
+
 async function upload(file) {
   if (state.uploading) return;
   if (file.size > 25 * 1024 * 1024) {
@@ -650,8 +678,16 @@ async function upload(file) {
   state.uploading = true;
   toast('Belgeniz yükleniyor…');
   try {
-    const mode = state.splitPages ? '&split=pages' : '';
-    const doc = await api(`/api/uploads?name=${encodeURIComponent(file.name)}${mode}`, {
+    const inspection = await api('/api/uploads/inspect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: file,
+    });
+    const mode = inspection.page_count === 1
+      ? 'single'
+      : state.splitPages ? 'pages' : await choosePdfLayout(inspection.page_count);
+    if (!mode) return;
+    const doc = await api(`/api/uploads?name=${encodeURIComponent(file.name)}&split=${mode}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
       body: file,
@@ -789,7 +825,7 @@ function renderReview() {
     </div>
     ${renderBatchNavigation(d)}
     ${d.mime === 'application/pdf' && !d.batch_id && !processing
-      ? `<div class="pdf-split-toolbar"><button class="btn btn-light" data-action="split-invoice-pages">${icon('files')} Her sayfayı ayrı fatura olarak oku</button></div>`
+      ? `<div class="pdf-split-toolbar"><button class="btn btn-light" data-action="split-invoice-pages">${icon('files')} Toplu fatura olarak oku</button></div>`
       : ''}
     <div class="review-grid">
       <aside class="card preview-panel">
@@ -2731,7 +2767,7 @@ function renderDuplicateInvoice(doc) {
       <p>Numara okunduktan sonra sistemdeki faturalarla karşılaştırıldı.</p>
       <div class="approval-actions">
         ${doc.mime === 'application/pdf' && !doc.batch_id
-          ? '<button class="btn btn-light" data-action="split-invoice-pages">Her sayfayı ayrı fatura olarak oku</button>'
+          ? '<button class="btn btn-light" data-action="split-invoice-pages">Toplu fatura olarak oku</button>'
           : ''}
         <a class="btn btn-primary" href="#document/${encodeURIComponent(doc.duplicate_of)}"
           >Mevcut faturayı aç</a

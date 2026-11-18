@@ -3276,6 +3276,17 @@ button {
   cursor: pointer;
 }
 
+.pdf-layout-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.pdf-layout-options .btn {
+  white-space: normal;
+}
+
 .pdf-split-option input {
   margin-top: 3px;
   accent-color: #214b90;

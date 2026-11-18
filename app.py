@@ -23,7 +23,7 @@ from invoice import number, validate
 from storage import Store, DuplicateInvoice
 from model_runtime import analyze_paddle
 from service_analysis import Services
-from pdf_batch import split_pages
+from pdf_batch import inspect_pdf, split_pages
 
 ROOT = Path(__file__).resolve().parent
 MAX_UPLOAD = 25 * 1024 * 1024
@@ -426,13 +426,30 @@ class InvoiceEndpoints:
         if len(parts) == 4 and parts[:2] == ["api", "services"] and parts[3] == "save":
             row = self.app.services.update(unquote(parts[2]), json.loads(self.body()))
             return self.send(200, row)
+        if parsed.path == "/api/uploads/inspect":
+            return self.send(200, {"page_count": inspect_pdf(self.body(MAX_UPLOAD))})
         if parsed.path == "/api/uploads":
             data = self.body(MAX_UPLOAD)
             filename = Path(
                 parse_qs(parsed.query).get("name", ["fatura"])[0].replace("\\", "/")
             ).name[:180]
-            split = parse_qs(parsed.query).get("split", [""])[0] == "pages"
-            return self.send(201, self.app.accept_upload(data, filename, split=split))
+            mode = parse_qs(parsed.query).get("split", [""])[0]
+            if mode not in ("", "single", "pages"):
+                raise ValueError("Geçerli bir PDF okuma düzeni seçin.")
+            if not mode:
+                count = inspect_pdf(data)
+                if count > 1:
+                    return self.send(
+                        409,
+                        {
+                            "error": "Çok sayfalı PDF için her sayfanın ayrı fatura mı, tek faturanın devamı mı olduğunu seçin.",
+                            "requires_layout": True,
+                            "page_count": count,
+                        },
+                    )
+            return self.send(
+                201, self.app.accept_upload(data, filename, split=mode == "pages")
+            )
         if len(parts) == 4 and parts[:2] == ["api", "documents"]:
             doc = self.document(parts[2])
             if parts[3] == "split":

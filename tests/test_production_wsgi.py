@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from wsgiref.util import setup_testing_defaults
+from reportlab.pdfgen.canvas import Canvas
 
 from app import Application
 from production import InstanceLock, ProductionApp, Settings
@@ -35,16 +37,18 @@ class ProductionWSGITests(unittest.TestCase):
         body=b"",
         auth=True,
         host="fatura.example.com",
-        **headers
+        **headers,
     ):
         environ = {}
         setup_testing_defaults(environ)
+        path, _, query = path.partition("?")
         environ.update(
             REQUEST_METHOD=method,
             PATH_INFO=path,
+            QUERY_STRING=query,
             HTTP_HOST=host,
             CONTENT_LENGTH=str(len(body)),
-            **{"wsgi.input": io.BytesIO(body)}
+            **{"wsgi.input": io.BytesIO(body)},
         )
         if auth:
             environ["HTTP_AUTHORIZATION"] = self.auth
@@ -62,6 +66,39 @@ class ProductionWSGITests(unittest.TestCase):
 
         captured["body"] = b"".join(self.wsgi(environ, respond))
         return captured
+
+    def test_multiple_invoices_require_a_layout_choice_before_creating_records(self):
+        output = io.BytesIO()
+        canvas = Canvas(output)
+        for index in range(4):
+            canvas.drawString(30, 700, f"Invoice {index + 1}")
+            canvas.showPage()
+        canvas.save()
+        with patch.object(self.app.executor, "submit") as queue:
+            inspection = self.request("/api/uploads/inspect", "POST", output.getvalue())
+            self.assertEqual(json.loads(inspection["body"]), {"page_count": 4})
+            rejected = self.request("/api/uploads", "POST", output.getvalue())
+            self.assertEqual(rejected["status"], 409)
+            self.assertTrue(json.loads(rejected["body"])["requires_layout"])
+            self.assertEqual(self.app.store.list(), [])
+            queue.assert_not_called()
+            accepted = self.request(
+                "/api/uploads?split=pages", "POST", output.getvalue()
+            )
+            self.assertEqual(accepted["status"], 201)
+            self.assertEqual(len(json.loads(accepted["body"])["documents"]), 4)
+            self.assertEqual(queue.call_count, 4)
+
+    def test_explicit_single_invoice_keeps_all_pages_together(self):
+        with patch.object(self.app.executor, "submit") as queue:
+            data = (
+                Path(__file__).resolve().parents[1] / "examples/multi_page.pdf"
+            ).read_bytes()
+            result = self.request("/api/uploads?split=single", "POST", data)
+            self.assertEqual(result["status"], 201)
+            self.assertNotIn("documents", json.loads(result["body"]))
+            self.assertEqual(len(self.app.store.list()), 1)
+            queue.assert_called_once()
 
     def test_auth_protects_html_api_and_source(self):
         for path in [
